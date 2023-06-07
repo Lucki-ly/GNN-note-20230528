@@ -18,10 +18,9 @@ Data = collections.namedtuple("Data", ["x", "y", "adjacency", "trn_mask", "val_m
 
 # 处理Cora数据
 class CoraData(object):
-    download_url = "https://github.com/kimiyoung/planetoid/raw/master/data"
     filenames = ["ind.cora.{}".format(name) for name in ['x', 'tx', 'allx', 'y', 'ty', 'ally', 'graph', 'test.index']]
 
-    def __init__(self, data_root="D:\\GNN\\GNN_Notes-master\\code\\data\\cora", rebuild=False):
+    def __init__(self, data_root="/content/drive/MyDrive/GNN-note-20230528-main/code/data/cora", rebuild=False):
         """包括数据下载、处理、加载等功能 当数据的缓存文件存在时，将使用缓存文件，否则将下载、处理，并缓存到磁盘
         Args:-------
         data_root: string, optional 存放数据的目录，原始数据路径: {data_root}/raw 缓存数据路径: {data_root}/processed_cora.pkl

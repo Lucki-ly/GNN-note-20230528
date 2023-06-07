@@ -22,7 +22,7 @@ class CoraData(object):
     filenames = ["ind.cora.{}".format(name) for name in
                  ['x', 'tx', 'allx', 'y', 'ty', 'ally', 'graph', 'test.index']]
 
-    def __init__(self, data_root="D:\\GNN\\GNN_Notes-master\\code\\data\\cora", rebuild=False):
+    def __init__(self, data_root="/content/drive/MyDrive/GNN-note-20230528-main/code/data/cora", rebuild=False):
         """Cora数据，包括数据下载，处理，加载等功能
         当数据的缓存文件存在时，将使用缓存文件，否则将下载、进行处理，并缓存到磁盘
 
