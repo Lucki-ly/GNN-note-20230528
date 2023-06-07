@@ -1,4 +1,3 @@
-#建议用google colab跑！！！速度巨快（除了GAT，这是真慢）
 import scipy.sparse as sp
 import torch
 from torch import nn
@@ -15,12 +14,12 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # 保存处理好的数据
-Data = collections.namedtuple('Data', ['x', 'y', 'adjacency_dict',
-                           'train_mask', 'val_mask', 'test_mask'])
+Data = collections.namedtuple('Data', ['x', 'y', 'adjacency',
+                           'trn_mask', 'val_mask', 'test_mask'])
+
 
 # 处理Cora数据
 class CoraData(object):
-
     filenames = ["ind.cora.{}".format(name) for name in ['x', 'tx', 'allx', 'y', 'ty', 'ally', 'graph', 'test.index']]
 
     def __init__(self, data_root="/content/drive/MyDrive/GNN-note-20230528-main/code/data/cora", rebuild=False):
@@ -192,46 +191,43 @@ def accuracy(mask):
 
 
 if __name__ == "__main__":
-    #1.加载数据
-    dataset = CoraData().data
-    #如果有GPU则使用GPU
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    #接着预处理剩下的数据
-    x = dataset.x / dataset.x.sum(1, keepdims=True)
-    # 归一化数据，使得每一行和为1
-    tensor_x = torch.from_numpy(x).to(device)
-    tensor_y = torch.from_numpy(dataset.y).to(device)
-    tensor_train_mask = torch.from_numpy(dataset.train_mask).to(device)
-    tensor_val_mask = torch.from_numpy(dataset.val_mask).to(device)
-    tensor_test_mask = torch.from_numpy(dataset.test_mask).to(device)
-    normalize_adjacency = dataset.adjacency_dict
-    # 规范化邻接矩阵
-    indices = torch.from_numpy(np.asarray([normalize_adjacency.row, normalize_adjacency.col])).long()
-    values = torch.from_numpy(normalize_adjacency.data.astype(np.float32))
-    tensor_adjacency = torch.sparse.FloatTensor(indices, values, (2708, 2708)).to(device)
-    #2.构建模型
-    model = GAT(1433, 16, 7, 0.2, 0.2, 4).to(device)
-    #3.训练模型
+    # 超参数定义
     learning_rate = 0.1
     weight_decay = 5e-4
     epochs = 5
+    # 模型定义，包括模型实例化、损失函数与优化器定义
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = GAT(1433, 16, 7, 0.2, 0.2, 4).to(device)
     # 损失函数使用交叉熵
     criterion = nn.CrossEntropyLoss().to(device)
     # 优化器使用Adam
     optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+    # 加载数据，并转换为torch.Tensor
+    dataset = CoraData().data
+    x = dataset.x / dataset.x.sum(1, keepdims=True)
+    # 归一化数据，使得每一行和为1
+    tensor_x = torch.from_numpy(x).to(device)
+    tensor_y = torch.from_numpy(dataset.y).to(device)
+    tensor_train_mask = torch.from_numpy(dataset.trn_mask).to(device)
+    tensor_val_mask = torch.from_numpy(dataset.val_mask).to(device)
+    tensor_test_mask = torch.from_numpy(dataset.test_mask).to(device)
+    normalize_adjacency = dataset.adjacency
+    # 规范化邻接矩阵
+    indices = torch.from_numpy(np.asarray([normalize_adjacency.row, normalize_adjacency.col])).long()
+    values = torch.from_numpy(normalize_adjacency.data.astype(np.float32))
+    tensor_adjacency = torch.sparse.FloatTensor(indices, values, (2708, 2708)).to(device)
     # 训练
     loss_history = []
     val_acc_history = []
     model.train()
     train_y = tensor_y[tensor_train_mask]
     for epoch in range(epochs):
+        logits = model(tensor_x, tensor_adjacency)
         # 前向传播
-        logits = model(tensor_x,tensor_adjacency)
-        # 只选择训练节点进行监督
         train_mask_logits = logits[tensor_train_mask]
-        # 计算损失值
+        # 只选择训练节点进行监督
         loss = criterion(train_mask_logits, train_y)
-        
+        # 计算损失值
         optimizer.zero_grad()
         loss.backward()
         # 反向传播计算参数的梯度
@@ -244,22 +240,20 @@ if __name__ == "__main__":
         # 记录训练过程中损失值和准确率的变化，用于画图
         loss_history.append(loss.item())
         val_acc_history.append(val_acc.item())
-        print("Epoch {:03d}: Loss {:.4f}, TrainAcc {:.4}, ValAcc {:.4f}".format(epoch, loss.item(), train_acc.item(), val_acc.item()))
-    #4.查看效果
-    import warnings
-    warnings.filterwarnings("ignore",category=DeprecationWarning)
-    #%matplotlib inline
-    #对X用tsne降维
+        print("Epoch {:03d}: Loss {:.4f}, TrainAcc {:.4}, ValAcc {:.4f}".format(epoch, loss.item(), train_acc.item(),
+                                                                                val_acc.item()))
+    # tsne降维，查看效果
     from sklearn import manifold
-    tsne = manifold.TSNE(n_components=2,init="pca")
+
+    tsne = manifold.TSNE(n_components=2)
     X_tsne = tsne.fit_transform(tensor_x.numpy())
-    #预测
-    pred = model(tensor_x,tensor_adjacency).max(1)[1].numpy()
-    #归一化显示
+    pred = logits.max(1)[1].numpy()
     x_min, x_max = X_tsne.min(0), X_tsne.max(0)
-    X_norm = (X_tsne - x_min) / (x_max - x_min)
-    plt.figure(figsize=(12, 9))
-    plt.scatter(X_norm[:,0],X_norm[:,1],c=pred)
-    plt.yticks([])
+    X_norm = (X_tsne - x_min) / (x_max - x_min)  # 归一化
+    plt.figure(figsize=(8, 8))
+    for i in range(X_norm.shape[0]):
+        plt.text(X_norm[i, 0], X_norm[i, 1], str(pred[i]), color=plt.cm.Set1(pred[i]),
+                 fontdict={'weight': 'bold', 'size': 9})
     plt.xticks([])
+    plt.yticks([])
     plt.show()
