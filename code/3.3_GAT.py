@@ -14,12 +14,12 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # 保存处理好的数据
-Data = collections.namedtuple('Data', ['x', 'y', 'adjacency',
-                           'trn_mask', 'val_mask', 'test_mask'])
+Data = collections.namedtuple("Data", ["x", "y", "adjacency", "trn_mask", "val_mask", "test_mask"])
 
 
 # 处理Cora数据
 class CoraData(object):
+    download_url = "https://github.com/kimiyoung/planetoid/raw/master/data"
     filenames = ["ind.cora.{}".format(name) for name in ['x', 'tx', 'allx', 'y', 'ty', 'ally', 'graph', 'test.index']]
 
     def __init__(self, data_root="/content/drive/MyDrive/GNN-note-20230528-main/code/data/cora", rebuild=False):
@@ -63,16 +63,14 @@ class CoraData(object):
         train_mask[train_index] = True
         val_mask[val_index] = True
         test_mask[test_index] = True
-        adjacency_dict = graph
+        adjacency = self.build_adjacency(graph)
         print("Node's feature shape: ", x.shape)
         print("Node's label shape: ", y.shape)
-        print("Adjacency's shape: ", len(adjacency_dict))
+        print("Adjacency's shape: ", adjacency.shape)
         print("Number of training nodes: ", train_mask.sum())
         print("Number of validation nodes: ", val_mask.sum())
         print("Number of test nodes: ", test_mask.sum())
-
-        return Data(x=x, y=y, adjacency_dict=adjacency_dict,
-                    train_mask=train_mask, val_mask=val_mask, test_mask=test_mask)
+        return Data(x=x, y=y, adjacency=adjacency, trn_mask=train_mask, val_mask=val_mask, test_mask=test_mask)
 
     @staticmethod
     def build_adjacency(adj_dict):
